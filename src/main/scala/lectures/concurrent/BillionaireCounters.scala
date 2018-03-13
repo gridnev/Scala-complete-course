@@ -1,6 +1,7 @@
 package lectures.concurrent
 
-import java.util.concurrent.Executors
+import java.util.concurrent._
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
   *
@@ -16,7 +17,7 @@ import java.util.concurrent.Executors
   * Так как вы уже кое-что знаете, то давайте не ударим в грязь лицом и предоставим сразу
   * несколько решений и выпишем сюда время их работы на вашей машине:
   *
-  * - SimpleBillionaireCounter        - ??? мс
+  * - SimpleBillionaireCounter        - 1362 мс
   * - LockingBillionaireCounter       - ??? мс
   * - AtomicBillionaireCounter        - ??? мс
   * - ExtremelyFastBillionaireCounter - ??? мс
@@ -34,15 +35,18 @@ import java.util.concurrent.Executors
 object SimpleBillionaireCounter extends App with CounterWithReporter {
 
   var counter = 0
+  val that = this
 
-  override def getCounterValue: Int = counter
+  override def getCounterValue: Int = that.synchronized { counter }
 
   override def getTasks: Seq[Runnable] =
     (1 to 1000).map { _ =>
       new Runnable {
         override def run(): Unit = {
-          (1 to 1000000).foreach { _ =>
-            counter += 1
+          that.synchronized {
+            (1 to 1000000).foreach { _ =>
+              counter += 1
+            }
           }
         }
       }
@@ -56,9 +60,23 @@ object SimpleBillionaireCounter extends App with CounterWithReporter {
 /**
   * Напишите аналогичную реализацию подсчета без использования блокировок.
   */
-object AtomicBillionaireCounter extends App with CounterWithReporter  {
-  override def getCounterValue: Int = ???
-  override def getTasks: Seq[Runnable] = ???
+object AtomicBillionaireCounter extends App with CounterWithReporter {
+
+  private val counter: AtomicInteger = new AtomicInteger(0)
+
+  override def getCounterValue: Int = counter.intValue()
+
+  override def getTasks: Seq[Runnable] = (1 to 1000).map { _ =>
+    new Runnable {
+      override def run(): Unit = {
+        (1 to 1000000).foreach { _ =>
+          counter.getAndIncrement()
+        }
+      }
+    }
+  }
+
+  countEverything()
 }
 
 
@@ -66,8 +84,25 @@ object AtomicBillionaireCounter extends App with CounterWithReporter  {
   * А слабо написать еще быстрее?
   */
 object ExtremelyFastBillionaireCounter extends App with CounterWithReporter {
-  override def getCounterValue: Int = ???
-  override def getTasks: Seq[Runnable] = ???
+
+  private val counter: AtomicInteger = new AtomicInteger(0)
+
+  override def getCounterValue: Int = counter.get()
+
+  override def getTasks: Seq[Runnable] =
+    (1 to 1000).map { _ =>
+      new Runnable {
+        override def run(): Unit = {
+          var t = 0
+            (1 to 1000000).foreach { _ =>
+              t += 1
+            }
+          counter.getAndDecrement()
+        }
+      }
+    }
+
+  countEverything()
 }
 
 
